@@ -237,6 +237,55 @@ class SragRepository:
             result = connection.execute(sql, params)
             return self._rows_to_dicts(result)
 
+    def get_available_columns(self) -> set[str]:
+        with self._connect() as connection:
+            rows = connection.execute(
+                f"DESCRIBE {self.VIEW_NAME}"
+            ).fetchall()
+
+        return {str(row[0]).upper() for row in rows}
+
+    def get_comorbidity_distribution(
+        self,
+        filters: SragFilters = SragFilters(),
+        column_map: dict[str, str] | None = None,
+    ) -> list[dict[str, object]]:
+        if not column_map:
+            return []
+
+        where, params = self._where(filters)
+        separator = " AND " if where else " WHERE "
+        results: list[dict[str, object]] = []
+
+        with self._connect() as connection:
+            rows = connection.execute(
+                f"DESCRIBE {self.VIEW_NAME}"
+            ).fetchall()
+            available = {str(row[0]).upper() for row in rows}
+
+            for column, label in column_map.items():
+                safe_column = column.upper()
+                if safe_column not in available:
+                    continue
+
+                quoted_column = '"' + safe_column.replace('"', '""') + '"'
+                row = connection.execute(
+                    f"SELECT COUNT(*) FROM {self.VIEW_NAME}"
+                    f"{where}{separator}{quoted_column} = 1",
+                    params,
+                ).fetchone()
+                count = int(row[0])
+                if count > 0:
+                    results.append({
+                        "comorbidade": label,
+                        "casos": count,
+                    })
+
+        return sorted(
+            results,
+            key=lambda item: (-int(item["casos"]), str(item["comorbidade"])),
+        )
+
     def get_time_series(
         self,
         filters: SragFilters = SragFilters(),
