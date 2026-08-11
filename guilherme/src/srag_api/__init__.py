@@ -1,0 +1,1 @@
+"""SRAG epidemiological data platform."""
