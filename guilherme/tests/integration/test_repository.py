@@ -217,3 +217,30 @@ def test_comorbidity_distribution_counts_only_yes(repository):
     assert counts["CARDIOPATIA"] == 2
     assert counts["DIABETES"] == 2
     assert counts["OBESIDADE"] == 1
+def test_other_cause_death_is_known_outcome(tmp_path):
+    raw_df = pd.DataFrame(
+        [
+            {
+                "TP_IDADE": 3,
+                "NU_IDADE_N": 50,
+                "SG_UF": "PR",
+                "ID_MUNICIP": "CURITIBA",
+                "CO_MUN_RES": 410690,
+                "EVOLUCAO": 3,
+                "UTI": 2,
+                "CS_SEXO": "M",
+                "DT_SIN_PRI": "10/06/2025",
+                "SEM_PRI": 24,
+            }
+        ]
+    )
+
+    parquet_root = tmp_path / "parquet"
+    transformed = transform_srag_dataframe(raw_df, 2025)
+    write_year_parquet(transformed, parquet_root, 2025)
+
+    repository = SragRepository(parquet_root)
+
+    assert repository.get_known_outcome_count() == 1
+    assert repository.get_unknown_outcome_count() == 0
+    assert repository.get_deaths() == 0

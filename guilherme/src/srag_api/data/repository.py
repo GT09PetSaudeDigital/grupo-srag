@@ -135,7 +135,10 @@ class SragRepository:
         filters: SragFilters = SragFilters(),
     ) -> int:
         where, params = self._where(filters)
-        extra = "DESFECHO_NORMALIZADO IN ('CURA', 'OBITO_SRAG')"
+        extra = (
+            "DESFECHO_NORMALIZADO IN "
+            "('CURA', 'OBITO_SRAG', 'OBITO_OUTRAS_CAUSAS')"
+        )
         separator = " AND " if where else " WHERE "
         with self._connect() as connection:
             row = connection.execute(
@@ -150,7 +153,7 @@ class SragRepository:
         filters: SragFilters = SragFilters(),
     ) -> int:
         where, params = self._where(filters)
-        extra = "DESFECHO_NORMALIZADO IN ('IGNORADO', 'AUSENTE', 'OUTRO', 'OBITO_OUTRAS_CAUSAS')"
+        extra = "DESFECHO_NORMALIZADO IN ('IGNORADO', 'AUSENTE', 'OUTRO')"
         separator = " AND " if where else " WHERE "
         with self._connect() as connection:
             row = connection.execute(
