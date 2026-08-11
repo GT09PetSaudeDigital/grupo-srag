@@ -4,12 +4,13 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "srag-api"
-version = "0.1.0"
+version = "0.2.0"
 description = "Pipeline e API epidemiologica para dados SRAG/SIVEP-Gripe"
 requires-python = ">=3.10"
 dependencies = [
     "pandas>=2.0",
     "pyarrow>=14.0",
+    "duckdb>=1.4,<2",
 ]
 
 [project.optional-dependencies]
@@ -21,5 +22,5 @@ dev = [
 where = ["src"]
 
 [tool.pytest.ini_options]
-pythonpath = ["src"]
+pythonpath = ["src", "."]
 testpaths = ["tests"]
