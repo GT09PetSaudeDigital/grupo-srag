@@ -64,3 +64,53 @@ def test_transform_adds_final_classification_and_detailed_etiology():
     assert result.loc[0, "CLASSI_FIN"] == 4
     assert result.loc[0, "PCR_SARS2"] == 1
 
+def test_transform_2019_schema_without_covid_fields_preserves_absence():
+    raw_df = pd.DataFrame(
+        [
+            {
+                "TP_IDADE": 3,
+                "NU_IDADE_N": 35,
+                "SG_UF": "PR",
+                "ID_MUNICIP": "CURITIBA",
+                "CO_MUN_RES": 410690,
+                "EVOLUCAO": 1,
+                "UTI": 2,
+                "CS_SEXO": "F",
+                "CLASSI_FIN": 1,
+                "PCR_FLUAS": 1,
+            }
+        ]
+    )
+
+    result = transform_srag_dataframe(raw_df, 2019)
+
+    assert result.loc[0, "CLASSIFICACAO_FINAL_NORMALIZADA"] == "INFLUENZA"
+    assert result.loc[0, "ETIOLOGIA_DETALHADA"] == "Influenza A"
+    assert "PCR_SARS2" not in result.columns
+    assert result.loc[0, "CLASSI_FIN"] == 1
+    assert result.loc[0, "PCR_FLUAS"] == 1
+
+
+def test_transform_schema_without_classification_or_lab_fields_is_tolerated():
+    raw_df = pd.DataFrame(
+        [
+            {
+                "TP_IDADE": 3,
+                "NU_IDADE_N": 50,
+                "SG_UF": "MT",
+                "ID_MUNICIP": "PRIMAVERA DO LESTE",
+                "CO_MUN_RES": 510704,
+                "EVOLUCAO": 1,
+                "UTI": 2,
+                "CS_SEXO": "M",
+            }
+        ]
+    )
+
+    result = transform_srag_dataframe(raw_df, 2019)
+
+    assert result.loc[0, "CLASSIFICACAO_FINAL_NORMALIZADA"] == "AUSENTE"
+    assert result.loc[0, "ETIOLOGIA_DETALHADA"] == "NAO_IDENTIFICADA"
+    assert "PCR_SARS2" not in result.columns
+    assert "PCR_FLUAS" not in result.columns
+    assert "PCR_VSR" not in result.columns
