@@ -1,8 +1,8 @@
 import pandas as pd
 
 from srag_api.data.etiology import (
-    add_etiology_column,
-    normalize_etiology,
+    add_etiology_columns,
+    normalize_detailed_etiology,
     normalize_final_classification,
 )
 
@@ -41,50 +41,6 @@ def test_final_classification_unexpected():
     assert normalize_final_classification(99) == "OUTRO"
 
 
-def test_influenza_a():
-    assert normalize_etiology(
-        make_row(CLASSI_FIN=None, PCR_FLUAS=1)
-    ) == "Influenza A"
-
-
-def test_influenza_b():
-    assert normalize_etiology(
-        make_row(CLASSI_FIN=None, PCR_FLUBS=1)
-    ) == "Influenza B"
-
-
-def test_vsr():
-    assert normalize_etiology(
-        make_row(CLASSI_FIN=None, PCR_VSR=1)
-    ) == "VSR"
-
-
-def test_unknown_is_not_identified():
-    assert normalize_etiology(
-        make_row(CLASSI_FIN=None)
-    ) == "Nao identificado"
-
-
-def test_add_etiology_column_keeps_original_columns():
-    df = pd.DataFrame(
-        {
-            "CLASSI_FIN": [5, None],
-            "PCR_FLUAS": [None, 1],
-        }
-    )
-
-    result = add_etiology_column(df)
-
-    assert result["ETIOLOGIA_NORMALIZADA"].tolist() == [
-        "COVID-19",
-        "Influenza A",
-    ]
-from srag_api.data.etiology import (
-    add_etiology_columns,
-    normalize_detailed_etiology,
-)
-
-
 def test_detailed_etiology_sars_cov_2():
     assert normalize_detailed_etiology(
         make_row(PCR_SARS2=1)
@@ -110,37 +66,14 @@ def test_detailed_etiology_vsr():
 
 
 def test_detailed_etiology_specific_other_viruses():
-    assert normalize_detailed_etiology(
-        make_row(PCR_ADENO=1)
-    ) == "Adenovirus"
-
-    assert normalize_detailed_etiology(
-        make_row(PCR_PARA1=1)
-    ) == "Parainfluenza 1"
-
-    assert normalize_detailed_etiology(
-        make_row(PCR_PARA2=1)
-    ) == "Parainfluenza 2"
-
-    assert normalize_detailed_etiology(
-        make_row(PCR_PARA3=1)
-    ) == "Parainfluenza 3"
-
-    assert normalize_detailed_etiology(
-        make_row(PCR_PARA4=1)
-    ) == "Parainfluenza 4"
-
-    assert normalize_detailed_etiology(
-        make_row(PCR_METAP=1)
-    ) == "Metapneumovirus"
-
-    assert normalize_detailed_etiology(
-        make_row(PCR_BOCA=1)
-    ) == "Bocavirus"
-
-    assert normalize_detailed_etiology(
-        make_row(PCR_RINO=1)
-    ) == "Rinovirus"
+    assert normalize_detailed_etiology(make_row(PCR_ADENO=1)) == "Adenovirus"
+    assert normalize_detailed_etiology(make_row(PCR_PARA1=1)) == "Parainfluenza 1"
+    assert normalize_detailed_etiology(make_row(PCR_PARA2=1)) == "Parainfluenza 2"
+    assert normalize_detailed_etiology(make_row(PCR_PARA3=1)) == "Parainfluenza 3"
+    assert normalize_detailed_etiology(make_row(PCR_PARA4=1)) == "Parainfluenza 4"
+    assert normalize_detailed_etiology(make_row(PCR_METAP=1)) == "Metapneumovirus"
+    assert normalize_detailed_etiology(make_row(PCR_BOCA=1)) == "Bocavirus"
+    assert normalize_detailed_etiology(make_row(PCR_RINO=1)) == "Rinovirus"
 
 
 def test_missing_pcr_column_is_not_negative():
@@ -156,18 +89,13 @@ def test_missing_pcr_value_is_not_positive():
 
 
 def test_final_classification_does_not_override_lab_result():
-    row = make_row(
-        CLASSI_FIN=4,
-        PCR_SARS2=1,
-    )
+    row = make_row(CLASSI_FIN=4, PCR_SARS2=1)
 
     assert normalize_final_classification(
         row["CLASSI_FIN"]
     ) == "NAO_ESPECIFICADO"
 
-    assert normalize_detailed_etiology(
-        row
-    ) == "SARS-CoV-2"
+    assert normalize_detailed_etiology(row) == "SARS-CoV-2"
 
 
 def test_add_etiology_columns_preserves_source_columns():
@@ -182,12 +110,11 @@ def test_add_etiology_columns_preserves_source_columns():
     result = add_etiology_columns(df)
 
     assert result["CLASSI_FIN"].tolist() == [4, 2]
-
+    assert result["PCR_SARS2"].iloc[0] == 1
     assert result["CLASSIFICACAO_FINAL_NORMALIZADA"].tolist() == [
         "NAO_ESPECIFICADO",
         "OUTRO_VIRUS_RESPIRATORIO",
     ]
-
     assert result["ETIOLOGIA_DETALHADA"].tolist() == [
         "SARS-CoV-2",
         "VSR",

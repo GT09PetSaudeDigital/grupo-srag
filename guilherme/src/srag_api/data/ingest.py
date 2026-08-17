@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from pathlib import Path
 
@@ -11,7 +11,7 @@ from srag_api.data.clean import (
     add_normalized_age_columns,
     add_temporal_columns,
 )
-from srag_api.data.etiology import add_etiology_column
+from srag_api.data.etiology import add_etiology_columns
 from srag_api.data.quality import build_quality_report, write_quality_report
 from srag_api.data.schema import normalize_column_names, validate_required_columns
 
@@ -39,7 +39,7 @@ def transform_srag_dataframe(
     result = add_core_normalized_columns(result)
     result = add_geography_columns(result)
     result = add_temporal_columns(result)
-    result = add_etiology_column(result)
+    result = add_etiology_columns(result)
     result["ANO"] = year
 
     return result
@@ -100,3 +100,4 @@ def ingest_year(
     )
 
     return parquet_path
+

@@ -1,4 +1,4 @@
-from pathlib import Path
+﻿from pathlib import Path
 import pandas as pd
 import pytest
 
@@ -13,7 +13,7 @@ def test_read_srag_csv_reads_semicolon_file():
 
 def test_transform_srag_dataframe_adds_analytic_columns():
     result = transform_srag_dataframe(read_srag_csv(FIXTURE), 2025)
-    for col in ["ANO","IDADE_ANOS","FAIXA_ETARIA","ETIOLOGIA_NORMALIZADA","DESFECHO_NORMALIZADO","FOI_UTI","OBITO_SRAG","CODIGO_MUNICIPIO","MUNICIPIO","UF"]:
+    for col in ["ANO","IDADE_ANOS","FAIXA_ETARIA","CLASSIFICACAO_FINAL_NORMALIZADA","ETIOLOGIA_DETALHADA","DESFECHO_NORMALIZADO","FOI_UTI","OBITO_SRAG","CODIGO_MUNICIPIO","MUNICIPIO","UF"]:
         assert col in result.columns
 
 def test_write_year_parquet_uses_partition_directory(tmp_path):
@@ -35,3 +35,32 @@ def test_ingest_year_is_incremental_without_force(tmp_path):
 def test_transform_rejects_unsupported_year():
     with pytest.raises(ValueError, match="Ano nao suportado"):
         transform_srag_dataframe(read_srag_csv(FIXTURE), 2018)
+
+def test_transform_adds_final_classification_and_detailed_etiology():
+    raw_df = pd.DataFrame(
+        [
+            {
+                "TP_IDADE": 3,
+                "NU_IDADE_N": 40,
+                "SG_UF": "MT",
+                "ID_MUNICIP": "CUIABA",
+                "CO_MUN_RES": 510340,
+                "EVOLUCAO": 1,
+                "UTI": 2,
+                "CS_SEXO": "F",
+                "CLASSI_FIN": 4,
+                "PCR_SARS2": 1,
+            }
+        ]
+    )
+
+    result = transform_srag_dataframe(raw_df, 2025)
+
+    assert (
+        result.loc[0, "CLASSIFICACAO_FINAL_NORMALIZADA"]
+        == "NAO_ESPECIFICADO"
+    )
+    assert result.loc[0, "ETIOLOGIA_DETALHADA"] == "SARS-CoV-2"
+    assert result.loc[0, "CLASSI_FIN"] == 4
+    assert result.loc[0, "PCR_SARS2"] == 1
+
