@@ -85,7 +85,7 @@ class SragRepository:
             params.append(filters.faixa_etaria)
 
         if filters.etiologia:
-            clauses.append("ETIOLOGIA_NORMALIZADA = ?")
+            clauses.append("ETIOLOGIA_DETALHADA = ?")
             params.append(filters.etiologia)
 
         if not clauses:
@@ -230,10 +230,10 @@ class SragRepository:
     ) -> list[dict[str, object]]:
         where, params = self._where(filters)
         sql = f"""
-            SELECT ETIOLOGIA_NORMALIZADA AS etiologia, COUNT(*) AS casos
+            SELECT ETIOLOGIA_DETALHADA AS etiologia, COUNT(*) AS casos
             FROM {self.VIEW_NAME}
             {where}
-            GROUP BY ETIOLOGIA_NORMALIZADA
+            GROUP BY ETIOLOGIA_DETALHADA
             ORDER BY casos DESC, etiologia
         """
         with self._connect() as connection:

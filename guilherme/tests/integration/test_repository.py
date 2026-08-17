@@ -151,7 +151,10 @@ def test_etiology_distribution(repository):
     result = repository.get_etiology_distribution()
     counts = {item["etiologia"]: item["casos"] for item in result}
 
-    assert counts["COVID-19"] == 2
+    assert counts["Influenza A"] == 2
+    assert counts["VSR"] == 1
+    assert counts["NAO_IDENTIFICADA"] == 2
+    assert "COVID-19" not in counts
     assert counts["Influenza A"] == 2
     assert counts["VSR"] == 1
 
