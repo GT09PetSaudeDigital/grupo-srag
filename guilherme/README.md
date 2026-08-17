@@ -146,6 +146,51 @@ casos UTI=SIM / casos com informação UTI conhecida
 
 `IGNORADO` e `AUSENTE` não entram no denominador.
 
+## Classificação final e etiologia laboratorial
+
+O pipeline mantém separadas duas dimensões analíticas que não devem ser confundidas:
+
+- `CLASSIFICACAO_FINAL_NORMALIZADA`: deriva exclusivamente de `CLASSI_FIN`;
+- `ETIOLOGIA_DETALHADA`: deriva exclusivamente das flags laboratoriais disponíveis no registro.
+
+Mapeamento de `CLASSI_FIN`:
+
+```text
+1 -> INFLUENZA
+2 -> OUTRO_VIRUS_RESPIRATORIO
+3 -> OUTRO_AGENTE_ETIOLOGICO
+4 -> NAO_ESPECIFICADO
+5 -> COVID-19
+ausente -> AUSENTE
+valor inesperado -> OUTRO
+```
+
+A etiologia detalhada identifica, quando houver flag laboratorial positiva, agentes como `SARS-CoV-2`, `Influenza A`, `Influenza B`, `VSR`, adenovírus, parainfluenza, metapneumovírus, bocavírus e rinovírus. Quando nenhum campo configurado estiver positivo, o valor é `NAO_IDENTIFICADA`.
+
+As duas colunas são independentes. Por exemplo, um registro com `CLASSI_FIN=4` e `PCR_SARS2=1` permanece com:
+
+```text
+CLASSIFICACAO_FINAL_NORMALIZADA = NAO_ESPECIFICADO
+ETIOLOGIA_DETALHADA = SARS-CoV-2
+```
+
+O pipeline não usa a classificação final para inferir resultado laboratorial e não usa o resultado laboratorial para sobrescrever a classificação final.
+
+### Compatibilidade entre anos
+
+O processamento cobre 2019–2026 com um único pipeline. Diferenças históricas de schema são tratadas como disponibilidade de colunas, e não como regras especiais por ano.
+
+Uma coluna ausente no arquivo de origem não é criada artificialmente com valor negativo. Portanto:
+
+```text
+coluna inexistente != resultado negativo
+valor ausente       != resultado positivo
+```
+
+As colunas originais presentes no CSV são preservadas no conjunto transformado, permitindo auditoria e análises posteriores, inclusive para Machine Learning.
+
+O filtro público `etiologia` e o endpoint `GET /api/v1/etiologia` continuam estáveis; internamente, a camada analítica consulta `ETIOLOGIA_DETALHADA`.
+
 ## Comorbidades
 
 A API conta somente flags realmente presentes no Parquet e com valor positivo (`1`). Colunas ausentes não são interpretadas como ausência de doença.
