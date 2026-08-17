@@ -1,6 +1,20 @@
 from __future__ import annotations
 
 import pandas as pd
+FINAL_CLASSIFICATION_MAP = {
+    1: "INFLUENZA",
+    2: "OUTRO_VIRUS_RESPIRATORIO",
+    3: "OUTRO_AGENTE_ETIOLOGICO",
+    4: "NAO_ESPECIFICADO",
+    5: "COVID-19",
+}
+
+
+def normalize_final_classification(value: object) -> str:
+    if pd.isna(value):
+        return "AUSENTE"
+
+    return FINAL_CLASSIFICATION_MAP.get(value, "OUTRO")
 
 OTHER_RESPIRATORY_FLAGS = (
     "PCR_ADENO",
