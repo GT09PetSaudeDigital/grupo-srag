@@ -15,7 +15,7 @@ def build_quality_report(
     year: int,
 ) -> dict[str, object]:
     etiology = processed_df.get(
-        "ETIOLOGIA_NORMALIZADA",
+        "ETIOLOGIA_DETALHADA",
         pd.Series(index=processed_df.index, dtype="object"),
     )
 
@@ -29,7 +29,7 @@ def build_quality_report(
         "municipio_ausente": _missing_count(processed_df, "ID_MUNICIP"),
         "evolucao_ausente": _missing_count(processed_df, "EVOLUCAO"),
         "uti_ausente": _missing_count(processed_df, "UTI"),
-        "etiologia_nao_identificada": int((etiology == "Nao identificado").sum()),
+        "etiologia_nao_identificada": int((etiology == "NAO_IDENTIFICADA").sum()),
     }
 
 def write_quality_report(report: dict[str, object], output_path: Path) -> None:
