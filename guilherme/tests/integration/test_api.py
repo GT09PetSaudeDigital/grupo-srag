@@ -36,7 +36,7 @@ class FakeService:
         return {"dados": [{"faixa_etaria": "60-74", "casos": 20}]}
 
     def get_etiology_distribution(self, filters):
-        return {"dados": [{"etiologia": "COVID-19", "casos": 30}]}
+        return {"dados": [{"etiologia": "SARS-CoV-2", "casos": 30}]}
 
     def get_comorbidity_distribution(self, filters):
         return {"dados": [{"comorbidade": "DIABETES", "casos": 12}]}
@@ -112,10 +112,38 @@ def test_age_bands_endpoint():
     assert response.json()["dados"][0]["faixa_etaria"] == "60-74"
 
 
-def test_etiology_endpoint():
-    response = client.get("/api/v1/etiologia", params={"uf": "PR"})
+def test_etiology_endpoint_preserves_public_contract():
+    class RecordingService(FakeService):
+        def __init__(self):
+            self.filters = None
+
+        def get_etiology_distribution(self, filters):
+            self.filters = filters
+            return {
+                "dados": [
+                    {"etiologia": "SARS-CoV-2", "casos": 30}
+                ]
+            }
+
+    service = RecordingService()
+    app.dependency_overrides[get_service] = lambda: service
+    local_client = TestClient(app)
+
+    try:
+        response = local_client.get(
+            "/api/v1/etiologia",
+            params={"uf": "PR", "etiologia": "SARS-CoV-2"},
+        )
+    finally:
+        app.dependency_overrides[get_service] = lambda: FakeService()
+
     assert response.status_code == 200
-    assert response.json()["dados"][0]["etiologia"] == "COVID-19"
+    assert response.json()["dados"] == [
+        {"etiologia": "SARS-CoV-2", "casos": 30}
+    ]
+    assert service.filters is not None
+    assert service.filters.uf == "PR"
+    assert service.filters.etiologia == "SARS-CoV-2"
 
 
 def test_comorbidities_endpoint():
