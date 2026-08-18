@@ -219,3 +219,157 @@ def test_auc_pr_tie_is_resolved_by_model_registry_order():
 
     assert best.name == "logistic_regression"
 
+def _build_temporal_training_fixture():
+    from srag_api.ml.dataset import AdmissionDataset
+    from srag_api.ml.split import TemporalSplit
+
+    X = pd.DataFrame(
+        {
+            "NU_IDADE_N": [20, 40, 60, 80, 30, 70, 35, 75],
+        }
+    )
+    y = pd.Series([0, 1, 0, 1, 0, 1, 1, 0], dtype="Int64")
+    metadata = pd.DataFrame(
+        {
+            "ANO": [2023, 2024, 2023, 2024, 2025, 2025, 2026, 2026],
+        }
+    )
+
+    dataset = AdmissionDataset(X=X, y=y, metadata=metadata)
+    split = TemporalSplit(
+        train_idx=[0, 1, 2, 3],
+        validation_idx=[4, 5],
+        test_idx=[6, 7],
+    )
+    return dataset, split
+
+
+def test_run_admission_training_uses_temporal_partitions():
+    module = _load_training_module()
+    assert module is not None, "srag_api.ml.training ainda nao foi implementado"
+    assert hasattr(module, "run_admission_training"), (
+        "run_admission_training ainda nao foi implementado"
+    )
+
+    dataset, split = _build_temporal_training_fixture()
+
+    result = module.run_admission_training(
+        dataset,
+        split,
+        numeric_features=["NU_IDADE_N"],
+        categorical_features=[],
+    )
+
+    assert result.train_size == 4
+    assert result.validation_size == 2
+    assert result.test_size == 2
+    assert set(result.candidates) == {
+        "logistic_regression",
+        "random_forest",
+        "gradient_boosting",
+        "hist_gradient_boosting",
+    }
+    assert result.best_model_name in result.candidates
+
+
+def test_run_admission_training_selects_threshold_from_validation_only(monkeypatch):
+    module = _load_training_module()
+    assert module is not None
+    assert hasattr(module, "run_admission_training")
+
+    dataset, split = _build_temporal_training_fixture()
+    captured = {}
+
+    original_select = module.select_decision_threshold
+
+    def recording_select(y_validation, probabilities, *, min_precision=0.50):
+        captured["y"] = list(y_validation)
+        captured["n"] = len(probabilities)
+        return original_select(
+            y_validation,
+            probabilities,
+            min_precision=min_precision,
+        )
+
+    monkeypatch.setattr(module, "select_decision_threshold", recording_select)
+
+    module.run_admission_training(
+        dataset,
+        split,
+        numeric_features=["NU_IDADE_N"],
+        categorical_features=[],
+    )
+
+    assert captured["y"] == dataset.y.iloc[split.validation_idx].tolist()
+    assert captured["n"] == len(split.validation_idx)
+
+
+def test_run_admission_training_evaluates_test_only_after_selection(monkeypatch):
+    module = _load_training_module()
+    assert module is not None
+    assert hasattr(module, "run_admission_training")
+
+    dataset, split = _build_temporal_training_fixture()
+    events = []
+
+    original_select_best = module.select_best_candidate
+    original_select_threshold = module.select_decision_threshold
+    original_evaluate = module.evaluate_binary_predictions
+
+    def recording_best(candidates):
+        events.append("select_model")
+        return original_select_best(candidates)
+
+    def recording_threshold(y_validation, probabilities, *, min_precision=0.50):
+        events.append("select_threshold")
+        return original_select_threshold(
+            y_validation,
+            probabilities,
+            min_precision=min_precision,
+        )
+
+    def recording_evaluate(y_true, probabilities, *, threshold=0.5):
+        if list(y_true) == dataset.y.iloc[split.test_idx].tolist():
+            events.append("evaluate_test")
+        return original_evaluate(y_true, probabilities, threshold=threshold)
+
+    monkeypatch.setattr(module, "select_best_candidate", recording_best)
+    monkeypatch.setattr(module, "select_decision_threshold", recording_threshold)
+    monkeypatch.setattr(module, "evaluate_binary_predictions", recording_evaluate)
+
+    module.run_admission_training(
+        dataset,
+        split,
+        numeric_features=["NU_IDADE_N"],
+        categorical_features=[],
+    )
+
+    assert events.index("select_model") < events.index("select_threshold")
+    assert events.index("select_threshold") < events.index("evaluate_test")
+
+
+def test_run_admission_training_rejects_single_class_partition():
+    module = _load_training_module()
+    assert module is not None
+    assert hasattr(module, "run_admission_training")
+
+    dataset, split = _build_temporal_training_fixture()
+    bad_y = dataset.y.copy()
+    bad_y.iloc[split.validation_idx] = 0
+
+    from srag_api.ml.dataset import AdmissionDataset
+
+    bad_dataset = AdmissionDataset(
+        X=dataset.X,
+        y=bad_y,
+        metadata=dataset.metadata,
+    )
+
+    with pytest.raises(ValueError, match="duas classes"):
+        module.run_admission_training(
+            bad_dataset,
+            split,
+            numeric_features=["NU_IDADE_N"],
+            categorical_features=[],
+        )
+
