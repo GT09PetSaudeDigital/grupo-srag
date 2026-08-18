@@ -95,3 +95,102 @@ def test_build_preprocessor_accepts_categorical_only_features():
     )
 
     assert preprocessor is not None
+
+
+# --- Task 6: balanceamento restrito ao treino ---
+import importlib
+
+import pandas as pd
+
+
+def _load_preprocessing_module():
+    return importlib.import_module("srag_api.ml.preprocessing")
+
+
+def test_none_strategy_keeps_training_data_unchanged():
+    preprocessing = _load_preprocessing_module()
+
+    assert hasattr(
+        preprocessing,
+        "balance_training_data",
+    ), "balance_training_data ainda nao foi implementado"
+
+    X = pd.DataFrame({"x": [1, 2, 3]})
+    y = pd.Series([0, 0, 1])
+
+    X_out, y_out = preprocessing.balance_training_data(
+        X,
+        y,
+        strategy="none",
+    )
+
+    assert X_out.equals(X)
+    assert y_out.equals(y)
+
+
+def test_balance_api_only_accepts_training_partition():
+    preprocessing = _load_preprocessing_module()
+
+    assert hasattr(
+        preprocessing,
+        "balance_training_data",
+    ), "balance_training_data ainda nao foi implementado"
+
+    X_train = pd.DataFrame({"x": [1, 2, 3, 4]})
+    y_train = pd.Series([0, 0, 0, 1])
+
+    X_out, y_out = preprocessing.balance_training_data(
+        X_train,
+        y_train,
+        strategy="none",
+        random_state=42,
+    )
+
+    assert len(X_out) == len(y_out)
+    assert len(X_out) == len(X_train)
+
+
+def test_unknown_balance_strategy_is_rejected():
+    preprocessing = _load_preprocessing_module()
+
+    assert hasattr(
+        preprocessing,
+        "balance_training_data",
+    ), "balance_training_data ainda nao foi implementado"
+
+    X = pd.DataFrame({"x": [1, 2, 3]})
+    y = pd.Series([0, 0, 1])
+
+    try:
+        preprocessing.balance_training_data(
+            X,
+            y,
+            strategy="future_data",
+        )
+    except ValueError as exc:
+        assert "strategy" in str(exc).lower() or "estrateg" in str(exc).lower()
+    else:
+        raise AssertionError("Era esperado ValueError para estrategia desconhecida")
+
+
+def test_balance_rejects_mismatched_training_lengths():
+    preprocessing = _load_preprocessing_module()
+
+    assert hasattr(
+        preprocessing,
+        "balance_training_data",
+    ), "balance_training_data ainda nao foi implementado"
+
+    X = pd.DataFrame({"x": [1, 2, 3]})
+    y = pd.Series([0, 1])
+
+    try:
+        preprocessing.balance_training_data(
+            X,
+            y,
+            strategy="none",
+        )
+    except ValueError as exc:
+        assert "tamanho" in str(exc).lower() or "length" in str(exc).lower()
+    else:
+        raise AssertionError("Era esperado ValueError para tamanhos diferentes")

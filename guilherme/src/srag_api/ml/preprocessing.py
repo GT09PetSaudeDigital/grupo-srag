@@ -76,3 +76,29 @@ def transform_partitions(
         validation_transformed,
         test_transformed,
     )
+def balance_training_data(
+    X_train: pd.DataFrame,
+    y_train: pd.Series,
+    *,
+    strategy: str = "none",
+    random_state: int = 42,
+) -> tuple[pd.DataFrame, pd.Series]:
+    """Aplica balanceamento somente aos dados de treino.
+
+    Nesta V1, ``strategy="none"`` é suportada explicitamente.
+    Estratégias como SMOTE serão adicionadas apenas na etapa de
+    experimentação de modelos, após validação da representação das features.
+    """
+    if len(X_train) != len(y_train):
+        raise ValueError(
+            "X_train e y_train devem possuir o mesmo tamanho."
+        )
+
+    if strategy != "none":
+        raise ValueError(
+            f"Estrategia de balanceamento nao suportada: {strategy}"
+        )
+
+    _ = random_state
+
+    return X_train.copy(), y_train.copy()
