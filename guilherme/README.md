@@ -225,3 +225,71 @@ python -m pytest -v
 2. MCP Server reutilizando `SragService`;
 3. agente de IA para consultas epidemiológicas.
 
+## Machine Learning — Predição de Óbito na Admissão
+
+O módulo `src/srag_api/ml/` prepara um dataset nacional de SRAG para experimentos de Machine Learning voltados à predição de óbito por SRAG usando somente informações disponíveis até a notificação/admissão.
+
+### Pergunta de pesquisa
+
+Dado um paciente hospitalizado por SRAG, qual a probabilidade de óbito por SRAG usando apenas dados disponíveis até a notificação/admissão?
+
+### Definição do alvo
+
+- `CURA` → `0`
+- `OBITO_SRAG` → `1`
+- `OBITO_OUTRAS_CAUSAS` → excluído do treino
+- `AUSENTE`, `IGNORADO` e outros desfechos indefinidos → excluídos do treino
+
+### Política de features
+
+A V1 usa grupos de features demográficas, sintomas, comorbidades, UF/região e variáveis temporais conhecidas até a notificação/admissão.
+
+Município fica fora da V1 para reduzir alta cardinalidade e risco de memorização de padrões locais.
+
+Variáveis conhecidas por causar leakage ficam explicitamente bloqueadas, incluindo:
+
+- `EVOLUCAO`
+- `DESFECHO_NORMALIZADO`
+- `OBITO_SRAG`
+- `DT_EVOLUCA`
+- `UTI`
+- `SUPORT_VEN`
+- `QTD_DIAS`
+- `DIAS_INTERNA`
+- `PCR_EVOLUCAO`
+
+### Validação temporal
+
+A divisão padrão é:
+
+- 2019–2024 → treino
+- 2025 → validação
+- 2026 → teste fora do tempo
+
+O conjunto de 2026 não participa de imputação, encoding, scaler, balanceamento ou ajuste de hiperparâmetros.
+
+### Pré-processamento
+
+O pré-processador é ajustado exclusivamente no conjunto de treino.
+
+- imputação numérica por mediana
+- imputação categórica pelo valor mais frequente
+- `OneHotEncoder(handle_unknown="ignore")`
+- `StandardScaler` para features numéricas
+- validação e teste recebem apenas `transform`
+
+O balanceamento é restrito à partição de treino. Nesta etapa da V1, `strategy="none"` é suportada explicitamente; métodos como SMOTE ficam para a fase de experimentação de modelos.
+
+### Estrutura
+
+```text
+src/srag_api/ml/
+├── __init__.py
+├── features.py
+├── target.py
+├── dataset.py
+├── split.py
+└── preprocessing.py
+```
+
+O treinamento e comparação de modelos preditivos são uma etapa posterior, depois da validação do dataset V1.
