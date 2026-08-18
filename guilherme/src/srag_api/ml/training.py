@@ -73,6 +73,19 @@ def train_candidate_model(
         validation_metrics=validation_metrics,
     )
 
+NUMERIC_MODEL_FEATURES = frozenset({"NU_IDADE_N", "SINT_ATE_NOTIF"})
+
+
+def split_preprocessing_features(
+    X: pd.DataFrame,
+) -> tuple[list[str], list[str]]:
+    numeric = [column for column in X.columns if column in NUMERIC_MODEL_FEATURES]
+    categorical = [
+        column for column in X.columns if column not in NUMERIC_MODEL_FEATURES
+    ]
+    return numeric, categorical
+
+
 MODEL_SELECTION_ORDER = (
     "logistic_regression",
     "random_forest",
@@ -126,8 +139,8 @@ def run_admission_training(
     dataset,
     split,
     *,
-    numeric_features: list[str],
-    categorical_features: list[str],
+    numeric_features: list[str] | None = None,
+    categorical_features: list[str] | None = None,
     min_precision: float = 0.50,
     random_state: int = 42,
 ) -> TrainingRunResult:
@@ -149,6 +162,13 @@ def run_admission_training(
     _validate_no_leakage(X_train.columns)
     _validate_no_leakage(X_validation.columns)
     _validate_no_leakage(X_test.columns)
+
+    if numeric_features is None and categorical_features is None:
+        numeric_features, categorical_features = split_preprocessing_features(X_train)
+    elif numeric_features is None or categorical_features is None:
+        raise ValueError(
+            "numeric_features e categorical_features devem ser informadas juntas."
+        )
 
     candidates: dict[str, TrainedCandidate] = {}
 
