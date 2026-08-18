@@ -293,3 +293,54 @@ src/srag_api/ml/
 ```
 
 O treinamento e comparação de modelos preditivos são uma etapa posterior, depois da validação do dataset V1.
+
+## Treinamento de Machine Learning — mortalidade na admissão
+
+O módulo `srag_api.ml` inclui um pipeline de treinamento para predição de óbito por SRAG usando apenas informações disponíveis na admissão/notificação.
+
+A divisão temporal padrão é:
+
+- treino: 2019–2024;
+- validação: 2025;
+- teste out-of-time: 2026.
+
+A V1 compara quatro modelos:
+
+- Logistic Regression;
+- Random Forest;
+- Gradient Boosting;
+- HistGradientBoosting.
+
+A métrica principal de seleção é AUC-PR (`average_precision`). O melhor modelo é escolhido apenas com a validação de 2025.
+
+O limiar de decisão também é escolhido somente em 2025. A política principal maximiza recall sujeito a `precision >= 0.50`. Quando essa restrição não pode ser atendida, o fallback maximiza F1 e registra a política `fallback_max_f1`.
+
+O conjunto de 2026 é reservado exclusivamente para avaliação final out-of-time e não participa da escolha do modelo, limiar, preprocessamento, tuning ou definição de features.
+
+Para executar:
+
+```powershell
+python .\scripts\train_ml_admission.py --parquet-glob "data/parquet/srag/ano=*/srag.parquet"
+```
+
+Também é possível definir explicitamente o diretório de saída e os anos de validação/teste:
+
+```powershell
+python .\scripts\train_ml_admission.py `
+  --parquet-glob "data/parquet/srag/ano=*/srag.parquet" `
+  --output-dir "artifacts/ml-admission/execucao-manual" `
+  --validation-year 2025 `
+  --test-year 2026
+```
+
+Por padrão, os artefatos são gravados em `artifacts/ml-admission/<timestamp>/` e incluem:
+
+- `best_model.joblib`;
+- `metrics.json`;
+- `metrics.csv`;
+- `validation_comparison.csv`;
+- `confusion_matrix_validation.csv`;
+- `confusion_matrix_test.csv`;
+- `run_metadata.json`.
+
+Os artefatos experimentais ficam fora do Git. Como a base de 2026 pode estar parcial durante o ano, seus resultados devem ser interpretados como avaliação out-of-time daquele recorte disponível, sem retroalimentar ajustes desta V1.
