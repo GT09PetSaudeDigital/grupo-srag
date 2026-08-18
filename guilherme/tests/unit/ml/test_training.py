@@ -165,3 +165,57 @@ def test_training_rejects_known_leakage_feature():
             y_validation=y_validation,
             preprocessor=_simple_preprocessor(),
         )
+
+def _candidate_with_auc(module, name: str, auc_pr: float):
+    from srag_api.ml.metrics import BinaryMetrics
+
+    metrics = BinaryMetrics(
+        auc_pr=auc_pr,
+        roc_auc=0.5,
+        recall=0.5,
+        precision=0.5,
+        f1=0.5,
+        threshold=0.5,
+        confusion_matrix=np.array([[1, 0], [0, 1]]),
+    )
+
+    return module.TrainedCandidate(
+        name=name,
+        pipeline=Pipeline([]),
+        validation_probabilities=np.array([0.2, 0.8]),
+        validation_metrics=metrics,
+    )
+
+
+def test_best_candidate_is_selected_by_auc_pr():
+    module = _load_training_module()
+    assert module is not None, "srag_api.ml.training ainda nao foi implementado"
+
+    candidates = {
+        "logistic_regression": _candidate_with_auc(module, "logistic_regression", 0.60),
+        "random_forest": _candidate_with_auc(module, "random_forest", 0.72),
+        "gradient_boosting": _candidate_with_auc(module, "gradient_boosting", 0.68),
+        "hist_gradient_boosting": _candidate_with_auc(module, "hist_gradient_boosting", 0.70),
+    }
+
+    best = module.select_best_candidate(candidates)
+
+    assert best.name == "random_forest"
+    assert best.validation_metrics.auc_pr == pytest.approx(0.72)
+
+
+def test_auc_pr_tie_is_resolved_by_model_registry_order():
+    module = _load_training_module()
+    assert module is not None, "srag_api.ml.training ainda nao foi implementado"
+
+    candidates = {
+        "hist_gradient_boosting": _candidate_with_auc(module, "hist_gradient_boosting", 0.80),
+        "random_forest": _candidate_with_auc(module, "random_forest", 0.80),
+        "gradient_boosting": _candidate_with_auc(module, "gradient_boosting", 0.75),
+        "logistic_regression": _candidate_with_auc(module, "logistic_regression", 0.80),
+    }
+
+    best = module.select_best_candidate(candidates)
+
+    assert best.name == "logistic_regression"
+

@@ -71,3 +71,31 @@ def train_candidate_model(
         validation_probabilities=np.asarray(probabilities, dtype=float),
         validation_metrics=validation_metrics,
     )
+
+MODEL_SELECTION_ORDER = (
+    "logistic_regression",
+    "random_forest",
+    "gradient_boosting",
+    "hist_gradient_boosting",
+)
+
+
+def select_best_candidate(
+    candidates: dict[str, TrainedCandidate],
+) -> TrainedCandidate:
+    if not candidates:
+        raise ValueError("E necessario fornecer ao menos um candidato.")
+
+    registry_rank = {
+        name: index
+        for index, name in enumerate(MODEL_SELECTION_ORDER)
+    }
+
+    return max(
+        candidates.values(),
+        key=lambda candidate: (
+            candidate.validation_metrics.auc_pr,
+            -registry_rank.get(candidate.name, len(MODEL_SELECTION_ORDER)),
+        ),
+    )
+
