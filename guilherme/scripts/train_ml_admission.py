@@ -6,6 +6,7 @@ from glob import glob
 from pathlib import Path
 
 import pandas as pd
+import pyarrow.parquet as pq
 
 from srag_api.ml import (
     ADMISSION_FEATURES,
@@ -52,7 +53,19 @@ def load_normalized_parquets(pattern: str) -> pd.DataFrame:
             f"Nenhum arquivo Parquet encontrado para o padrao: {pattern}"
         )
 
-    frames = [pd.read_parquet(path) for path in files]
+    desired_columns = tuple(
+        dict.fromkeys(
+            (*ADMISSION_FEATURES, "DESFECHO_NORMALIZADO", "ANO", "SG_UF", "DT_NOTIFIC")
+        )
+    )
+    frames = []
+    for path in files:
+        existing_columns = set(pq.read_schema(path).names)
+        selected_columns = [
+            column for column in desired_columns if column in existing_columns
+        ]
+        frames.append(pd.read_parquet(path, columns=selected_columns))
+
     return pd.concat(frames, ignore_index=True)
 
 

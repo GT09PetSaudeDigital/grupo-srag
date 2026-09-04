@@ -13,6 +13,7 @@ from srag_api.ml import (
     save_training_artifacts,
     temporal_split,
 )
+from scripts.train_ml_admission import load_normalized_parquets
 
 
 def _synthetic_normalized_data() -> pd.DataFrame:
@@ -91,3 +92,46 @@ def test_training_cli_exposes_required_arguments():
     assert "--output-dir" in help_text
     assert "--validation-year" in help_text
     assert "--test-year" in help_text
+
+
+def test_load_normalized_parquets_ignores_unneeded_columns(tmp_path):
+    parquet_path = tmp_path / "normalized-2025.parquet"
+    pd.DataFrame(
+        {
+            "ANO": [2025],
+            "DESFECHO_NORMALIZADO": ["CURA"],
+            "NU_IDADE_N": [42],
+            "FEBRE": [1],
+            "SG_UF": ["MT"],
+            "DT_NOTIFIC": ["2025-01-02"],
+            "COLUNA_GIGANTE_INUTIL": ["conteudo inutil"],
+        }
+    ).to_parquet(parquet_path, index=False)
+
+    loaded = load_normalized_parquets(str(tmp_path / "*.parquet"))
+
+    assert "COLUNA_GIGANTE_INUTIL" not in loaded.columns
+
+
+def test_load_normalized_parquets_handles_different_schemas(tmp_path):
+    pd.DataFrame(
+        {
+            "ANO": [2024],
+            "DESFECHO_NORMALIZADO": ["CURA"],
+            "NU_IDADE_N": [35],
+            "FEBRE": [1],
+        }
+    ).to_parquet(tmp_path / "normalized-2024.parquet", index=False)
+    pd.DataFrame(
+        {
+            "ANO": [2025],
+            "DESFECHO_NORMALIZADO": ["OBITO_SRAG"],
+            "NU_IDADE_N": [70],
+        }
+    ).to_parquet(tmp_path / "normalized-2025.parquet", index=False)
+
+    loaded = load_normalized_parquets(str(tmp_path / "*.parquet"))
+
+    assert loaded["ANO"].tolist() == [2024, 2025]
+    assert loaded["FEBRE"].iloc[0] == 1
+    assert pd.isna(loaded["FEBRE"].iloc[1])
