@@ -17,7 +17,7 @@ SRAG, usando os dados do parquet do Guilherme.
      matriz de confusão e importância de variáveis via PCA loadings.
 
 Uso:
-    python predizer_obito_paciente.py --parquet-glob "data/parquet/srag/ano=*/srag.parquet"
+    python predizer_obito_paciente.py --parquet-glob "../guilherme/data/parquet/srag/ano=*/srag.parquet"
 """
 
 from __future__ import annotations
@@ -47,7 +47,10 @@ from sklearn.metrics import (
     confusion_matrix,
     f1_score,
     precision_recall_curve,
+    precision_score,
+    recall_score,
     roc_auc_score,
+    accuracy_score
 )
 from sklearn.model_selection import StratifiedKFold, cross_validate, train_test_split
 from sklearn.pipeline import Pipeline
@@ -215,14 +218,14 @@ def montar_preprocessador(df: pd.DataFrame):
 
 def montar_modelos() -> dict:
     base_lr = LogisticRegression(
-        max_iter=2000, class_weight="balanced", random_state=RANDOM_STATE
+        max_iter=1000, class_weight="balanced", random_state=RANDOM_STATE
     )
     base_rf = RandomForestClassifier(
-        n_estimators=400, max_depth=12, class_weight="balanced_subsample",
+        n_estimators=300, max_depth=12, class_weight="balanced_subsample",
         n_jobs=-1, random_state=RANDOM_STATE,
     )
     base_gb = GradientBoostingClassifier(
-        n_estimators=300, max_depth=3, learning_rate=0.05, random_state=RANDOM_STATE
+        n_estimators=200, max_depth=3, learning_rate=0.05, random_state=RANDOM_STATE
     )
     base_hgb = HistGradientBoostingClassifier(
         max_iter=400, max_depth=8, learning_rate=0.05,
@@ -286,39 +289,40 @@ def avaliar_modelos(pre_processador, X, y) -> dict:
     return resultados
 
 
-# Ajuste de limiar + avaliação final no conjunto de teste
+# avaliação final no conjunto de teste
 
-def ajustar_limiar_e_avaliar(pipeline, X_train, y_train, X_test, y_test):
-    pipeline.fit(X_train, y_train)
-    probas = pipeline.predict_proba(X_test)[:, 1]
+def avaliar(resultados: dict, X_train, y_train, X_test, y_test) -> dict:
+    """Treina cada modelo em resultados no treino e mede todos no mesmo
+    conjunto de teste, imprimindo as métricas de cada um."""
+    metricas_por_modelo = {}
+    for nome, info in resultados.items():
+        pipeline = info["pipeline"]
+        pipeline.fit(X_train, y_train)
+        probas = pipeline.predict_proba(X_test)[:, 1]
+        pred_padrao = (probas >= 0.5).astype(int)
 
-    precisoes, recalls, limiares = precision_recall_curve(y_test, probas)
-    f1s = 2 * (precisoes * recalls) / (precisoes + recalls + 1e-12)
-    melhor_idx = np.nanargmax(f1s[:-1])  # último ponto não tem limiar correspondente
-    melhor_limiar = limiares[melhor_idx]
+        metricas = {
+            "accuracy": accuracy_score(y_test, pred_padrao),
+            "roc_auc": roc_auc_score(y_test, probas),
+            "average_precision": average_precision_score(y_test, probas),
+            "f1": f1_score(y_test, pred_padrao),
+            "recall": recall_score(y_test, pred_padrao),
+            "precision": precision_score(y_test, pred_padrao),
+        }
+        metricas_por_modelo[nome] = metricas
 
-    pred_padrao = (probas >= 0.5).astype(int)
-    pred_ajustado = (probas >= melhor_limiar).astype(int)
+        print(f"\n[{nome}] (conjunto de teste)")
+        print(classification_report(y_test, pred_padrao, target_names=["sobrevivente", "obito"]))
+        print(
+            f"Accuracy={metricas['accuracy']:.4f}"
+            f"ROC-AUC={metricas['roc_auc']:.4f}  "
+            f"AUC-PR={metricas['average_precision']:.4f}  "
+            f"F1={metricas['f1']:.4f}  "
+            f"Recall={metricas['recall']:.4f}  "
+            f"Precision={metricas['precision']:.4f}"
+        )
 
-    print(f"\nLimiar ótimo (maximiza F1): {melhor_limiar:.3f} (padrão seria 0.5)")
-    print("\n--- Avaliação com limiar padrão (0.5) ---")
-    print(classification_report(y_test, pred_padrao, target_names=["sobrevivente", "obito"]))
-
-    print("--- Avaliação com limiar ajustado ---")
-    print(classification_report(y_test, pred_ajustado, target_names=["sobrevivente", "obito"]))
-
-    print(f"ROC-AUC (teste): {roc_auc_score(y_test, probas):.4f}")
-    print(f"AUC-PR  (teste): {average_precision_score(y_test, probas):.4f}")
-
-    matriz = confusion_matrix(y_test, pred_ajustado)
-    print("\nMatriz de confusão (limiar ajustado):")
-    print(pd.DataFrame(
-        matriz,
-        index=["real_sobrevivente", "real_obito"],
-        columns=["previsto_sobrevivente", "previsto_obito"],
-    ))
-
-    return melhor_limiar, probas
+    return metricas_por_modelo
 
 
 # variância explicada pelo PCA e principais componentes
@@ -382,12 +386,12 @@ def main():
     print(f"\n{'='*60}\nMelhor modelo por ROC-AUC (validação cruzada): {melhor_nome}\n{'='*60}")
 
     melhor_pipeline = resultados[melhor_nome]["pipeline"]
-    limiar, _ = ajustar_limiar_e_avaliar(melhor_pipeline, X_train, y_train, X_test, y_test)
+    avaliar(resultados, X_train, y_train, X_test, y_test)
     relatorio_pca(melhor_pipeline)
 
     joblib.dump(
-        {"pipeline": melhor_pipeline, "limiar_decisao": limiar, "colunas_usadas": colunas_usadas},
-        "modelo_obito_srag_paciente.joblib",
+        {"pipeline": melhor_pipeline, "limiar_decisao": 0.5, "colunas_usadas": colunas_usadas},
+        "modelo_obito_srag_paciente_2021.joblib",
     )
     print("\nModelo final salvo em modelo_obito_srag_paciente.joblib")
     print("(contém: pipeline completo pré-processamento+PCA+modelo, limiar de decisão e colunas usadas)")

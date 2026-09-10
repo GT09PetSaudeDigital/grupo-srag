@@ -414,8 +414,8 @@ def main():
     os.makedirs(PASTA_SAIDA, exist_ok=True)
     gerar_graficos(df, df_uf, uf=args.uf)
 
-    resultado_obito = rodar_ml(df_uf, alvo="EVOLUCAO", nome_alvo="Óbito")
-    resultado_uti = rodar_ml(df_uf, alvo="UTI", nome_alvo="Internação em UTI")
+    resultado_obito = rodar_ml(df, alvo="EVOLUCAO", nome_alvo="Óbito")
+    resultado_uti = rodar_ml(df, alvo="UTI", nome_alvo="Internação em UTI")
 
     print("\n=== CONCLUÍDO ===")
     print(f"Todos os gráficos e resultados estão na pasta ./{PASTA_SAIDA}/")
