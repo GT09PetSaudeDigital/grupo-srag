@@ -20,10 +20,11 @@ __all__ = [
     "TrainingRunResult",
     "run_admission_training",
     "ArtifactPaths",
+    "dataset_provenance",
     "save_training_artifacts",
 ]
 
-from .artifacts import ArtifactPaths, save_training_artifacts
+from .artifacts import ArtifactPaths, dataset_provenance, save_training_artifacts
 from .features import ADMISSION_FEATURES, LEAKAGE_FEATURES
 from .metrics import BinaryMetrics, evaluate_binary_predictions
 from .models import build_models

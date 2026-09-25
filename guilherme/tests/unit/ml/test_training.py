@@ -124,6 +124,57 @@ def test_gradient_boosting_receives_training_sample_weight():
     assert hasattr(result.pipeline.named_steps["model"], "classes_")
 
 
+def test_gradient_boosting_sample_weight_is_balanced_and_covers_every_row():
+    """O peso balanceado precisa chegar ao estimador, um peso por linha.
+
+    A verificacao anterior apenas checava ``classes_``, que existe mesmo sem
+    ``sample_weight``. Aqui o peso e conferido contra
+    ``compute_sample_weight(class_weight='balanced')`` e a contagem de linhas
+    precisa bater com a particao de treino.
+    """
+    module = _load_training_module()
+    assert module is not None
+
+    from sklearn.ensemble import GradientBoostingClassifier
+    from sklearn.utils.class_weight import compute_sample_weight
+
+    class _RecordingGradientBoosting(GradientBoostingClassifier):
+        """Subclasse real, para passar no isinstance, que grava o fit."""
+
+        def fit(self, X, y, **kwargs):
+            self.fit_kwargs = kwargs
+            return super().fit(X, y, **kwargs)
+
+    X_train, y_train, X_validation, y_validation = _training_frames()
+
+    # Alvo desbalanceado de proposito: com um fixture equilibrado o peso
+    # "balanced" seria 1.0 para todas as linhas e o teste nao provaria nada.
+    imbalanced = y_train.copy()
+    imbalanced.iloc[1:] = 0
+    imbalanced.iloc[0] = 1
+
+    result = module.train_candidate_model(
+        name="gradient_boosting",
+        estimator=_RecordingGradientBoosting(n_estimators=5, random_state=42),
+        X_train=X_train,
+        y_train=imbalanced,
+        X_validation=X_validation,
+        y_validation=y_validation,
+        preprocessor=_simple_preprocessor(),
+    )
+
+    model = result.pipeline.named_steps["model"]
+    assert "sample_weight" in model.fit_kwargs
+
+    weights = model.fit_kwargs["sample_weight"]
+    expected = compute_sample_weight(class_weight="balanced", y=imbalanced)
+
+    assert len(weights) == len(imbalanced)
+    assert np.allclose(weights, expected)
+    assert weights.max() > weights.min()
+
+
+
 def test_non_gradient_model_does_not_receive_external_sample_weight():
     module = _load_training_module()
     assert module is not None, "srag_api.ml.training ainda nao foi implementado"

@@ -182,10 +182,26 @@ remover precisa ser registrada.
 A V1 usou a coluna `ANO`, atribuída pelo ano do arquivo. A auditoria mostrou
 que esse ano não coincide com o ano civil das datas.
 
+O agravante é que a partição por ano de arquivo **não garante ordem
+cronológica**. O arquivo `ano=2025` contém início de sintomas de 29/12/2024,
+anteriores a parte do `ano=2024`, e notificações até 27/07/2026. Isso significa
+que:
+
+- linhas de validação podem ser cronologicamente **anteriores** a linhas de
+  treino;
+- a afirmação "validação temporal" da V1 é mais fraca do que a documentação
+  sugere, embora os anos de arquivo não se sobreponham;
+- o mesmo vale para o teste de 2026, cujos registros mais antigos podem
+  preceder parte da validação de 2025.
+
 A V2 deve:
 
+- usar a data efetiva do registro, não o ano do arquivo, para ordenar as
+  partições, com a data declarada em `ANO` apenas como agrupamento secundário;
 - documentar o calendário efetivo de cada partição, com o intervalo real de
   início de sintomas e de notificação observados;
+- medir e reportar quantos pares treino/validação estão invertidos na ordem
+  do tempo, para que a magnitude do problema seja conhecida;
 - oferecer mais de uma janela temporal de validação, para que a conclusão
   não dependa de um único ponto de corte no tempo;
 - declarar explicitamente que o arquivo de 2026 está parcial e qual o

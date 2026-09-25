@@ -203,3 +203,60 @@ def test_run_metadata_contains_reproducibility_fields(tmp_path):
     assert "python_version" in data
     assert "pandas_version" in data
     assert "scikit_learn_version" in data
+
+
+def test_dataset_provenance_records_name_size_and_modification_time(tmp_path):
+    module = _load_artifacts_module()
+    assert module is not None
+
+    parquet = tmp_path / "ano=2025" / "srag.parquet"
+    parquet.parent.mkdir(parents=True)
+    parquet.write_bytes(b"conteudo de teste")
+
+    entries = module.dataset_provenance([parquet])
+
+    assert len(entries) == 1
+    assert entries[0]["arquivo"] == "srag.parquet"
+    assert entries[0]["bytes"] == len(b"conteudo de teste")
+    assert entries[0]["caminho"].endswith("ano=2025/srag.parquet")
+    assert entries[0]["modificado_em"].endswith("+00:00")
+    assert "sha256" not in entries[0]
+
+
+def test_dataset_provenance_adds_hash_only_when_requested(tmp_path):
+    module = _load_artifacts_module()
+    assert module is not None
+
+    parquet = tmp_path / "srag.parquet"
+    parquet.write_bytes(b"conteudo de teste")
+
+    entries = module.dataset_provenance([parquet], with_hash=True)
+
+    assert entries[0]["sha256"] == module.file_digest(parquet)
+    assert len(entries[0]["sha256"]) == 64
+
+
+def test_run_metadata_carries_input_provenance(tmp_path):
+    """O ano corrente e um banco vivo: sem origem, o resultado nao se liga a base."""
+    module = _load_artifacts_module()
+    assert module is not None
+
+    parquet = tmp_path / "srag.parquet"
+    parquet.write_bytes(b"conteudo")
+
+    inputs = module.dataset_provenance([parquet])
+
+    paths = module.save_training_artifacts(
+        _training_result(),
+        output_dir=tmp_path / "out",
+        metadata={
+            "features_used": ["NU_IDADE_N"],
+            "parquet_glob": "data/parquet/srag/ano=*/srag.parquet",
+            "inputs": inputs,
+        },
+    )
+
+    data = json.loads(paths.run_metadata.read_text(encoding="utf-8"))
+
+    assert data["parquet_glob"] == "data/parquet/srag/ano=*/srag.parquet"
+    assert data["inputs"][0]["arquivo"] == "srag.parquet"

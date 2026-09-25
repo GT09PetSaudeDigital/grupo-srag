@@ -305,10 +305,19 @@ git commit -m "feat: torna explicito o tratamento de ausencia e ignorado"
 - `temporal_split` deixa de exigir que o ano de teste exista por padrão; a
   exigência vira opt-in, porque hoje ela impede qualquer experimento antes de
   existir registro do ano.
+- `ordering_violations(metadata, split) -> int` — quantos registros de
+  validação e de teste são cronologicamente **anteriores** a registros de
+  treino, usando a data efetiva e não o ano do arquivo. A partição por ano de
+  arquivo não garante ordem no tempo, e essa contagem precisa ser conhecida e
+  reportada, não presumida.
+- `temporal_split` aceita uma coluna de data (`DT_NOTIFIC` ou
+  `DATA_INICIO_SINTOMAS`) como critério primário de ordenação, com `ANO` apenas
+  como agrupamento secundário.
 
 - [ ] **Step 1: testes vermelhos** — calendário reflete os extremos reais;
   partição sem ano de teste é permitida quando pedido; janelas múltiplas não
-  se sobrepõem.
+  se sobrepõem; `ordering_violations` detecta inversão quando a janela de
+  validação começa antes do fim da de treino.
 - [ ] **Step 2: run RED**
 - [ ] **Step 3: implementar**
 - [ ] **Step 4: run GREEN**

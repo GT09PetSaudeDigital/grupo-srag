@@ -11,6 +11,7 @@ import pyarrow.parquet as pq
 from srag_api.ml import (
     ADMISSION_FEATURES,
     build_admission_dataset,
+    dataset_provenance,
     run_admission_training,
     save_training_artifacts,
     temporal_split,
@@ -43,15 +44,29 @@ def parse_args() -> argparse.Namespace:
         default=2026,
         help="Ano reservado para avaliacao final out-of-time.",
     )
+    parser.add_argument(
+        "--hash-inputs",
+        action="store_true",
+        help=(
+            "Grava o SHA256 de cada Parquet de entrada em run_metadata.json. "
+            "Lento para a base nacional; o tamanho e a data ja bastam para "
+            "identificar a base."
+        ),
+    )
     return parser.parse_args()
 
 
-def load_normalized_parquets(pattern: str) -> pd.DataFrame:
-    files = sorted(glob(pattern))
+def resolve_parquet_files(pattern: str) -> list[Path]:
+    files = sorted(Path(match) for match in glob(pattern))
     if not files:
         raise FileNotFoundError(
             f"Nenhum arquivo Parquet encontrado para o padrao: {pattern}"
         )
+    return files
+
+
+def load_normalized_parquets(pattern: str) -> pd.DataFrame:
+    files = resolve_parquet_files(pattern)
 
     desired_columns = tuple(
         dict.fromkeys(
@@ -109,6 +124,11 @@ def main() -> int:
         "features_used": list(dataset.X.columns),
         "features_missing": sorted(
             set(ADMISSION_FEATURES) - set(dataset.X.columns)
+        ),
+        "parquet_glob": args.parquet_glob,
+        "inputs": dataset_provenance(
+            resolve_parquet_files(args.parquet_glob),
+            with_hash=args.hash_inputs,
         ),
     }
 

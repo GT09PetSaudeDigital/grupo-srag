@@ -26,6 +26,21 @@ def select_decision_threshold(
     *,
     min_precision: float = 0.50,
 ) -> ThresholdSelection:
+    """Escolhe o limiar de decisao usando somente a validacao.
+    A politica principal maximiza o recall entre os limiares com
+    ``precision >= min_precision``. Como ``precision_recall_curve`` devolve
+    os thresholds em ordem crescente, o desempate por maior valor escolhe o
+    limiar mais alto, isto e, o mais conservador, que emite menos alertas.
+    Em caso de empate completo, o fallback maximiza F1 e usa o mesmo criterio
+    conservador.
+
+    Esse desempate e uma rede de seguranca, nao um caminho frequente. O grid do
+    sklearn tem um valor por probabilidade observada, e dois thresholds
+    consecutivos retiram do conjunto previsto ao menos um registro, de modo
+    que TP e FP nao podem ficar simultaneamente iguais. Empate exato em recall
+    e precision, portanto, nao ocorre nesse grid. A garantia testada e a
+    determinismo da selecao, que nao pode depender da ordem de insercao.
+    """
     if len(y_validation) != len(probabilities):
         raise ValueError(
             "y_validation e probabilities devem possuir o mesmo tamanho."

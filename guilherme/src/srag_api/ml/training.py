@@ -153,6 +153,7 @@ def select_best_candidate(
         key=lambda candidate: (
             candidate.validation_metrics.auc_pr,
             -registry_rank.get(candidate.name, len(MODEL_SELECTION_ORDER)),
+            candidate.name,
         ),
     )
 
@@ -174,8 +175,11 @@ class TrainingRunResult:
 def _validate_binary_partition(y: pd.Series, partition_name: str) -> None:
     classes = set(pd.Series(y).dropna().unique().tolist())
     if classes != {0, 1}:
+        ausentes = sorted({0, 1} - classes)
+        presentes = sorted(classes)
         raise ValueError(
-            f"A particao {partition_name} deve conter as duas classes 0 e 1."
+            f"A particao {partition_name} deve conter as duas classes 0 e 1. "
+            f"Ausentes: {ausentes}. Presentes: {presentes}."
         )
 
 

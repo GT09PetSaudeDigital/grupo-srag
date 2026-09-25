@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import hashlib
 import json
+from datetime import datetime, timezone
 from pathlib import Path
 import platform
 
@@ -10,6 +12,52 @@ import pandas as pd
 import sklearn
 
 from .training import TrainingRunResult
+
+HASH_CHUNK_SIZE = 1024 * 1024
+
+
+def file_digest(path: Path) -> str:
+    """SHA256 do arquivo, lido em blocos para nao carregar tudo na memoria."""
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        while True:
+            chunk = handle.read(HASH_CHUNK_SIZE)
+            if not chunk:
+                break
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def dataset_provenance(
+    paths: list[Path],
+    *,
+    with_hash: bool = False,
+) -> list[dict[str, object]]:
+    """Registra a origem dos Parquets consumidos pelo treinamento.
+
+    O ano corrente do SIVEP-Gripe e um banco vivo, rebaixado semanalmente.
+    Sem nome, tamanho e data de modificacao, um resultado nao pode ser
+    ligado a uma base especifica. O SHA256 e opcional porque os arquivos
+    nacionais chegam a gigabytes.
+    """
+    entries: list[dict[str, object]] = []
+
+    for path in paths:
+        stat = path.stat()
+        entry: dict[str, object] = {
+            "arquivo": path.name,
+            "caminho": str(path).replace("\\", "/"),
+            "bytes": stat.st_size,
+            "modificado_em": datetime.fromtimestamp(
+                stat.st_mtime,
+                tz=timezone.utc,
+            ).isoformat(timespec="seconds"),
+        }
+        if with_hash:
+            entry["sha256"] = file_digest(path)
+        entries.append(entry)
+
+    return entries
 
 
 @dataclass(frozen=True)
