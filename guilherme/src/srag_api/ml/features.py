@@ -1,8 +1,15 @@
-"""Catálogo de features seguras para o modelo de admissão SRAG."""
+"""Catálogo de features seguras para o modelo de admissão SRAG.
+
+A idade entra como ``IDADE_ANOS``, e não como ``NU_IDADE_N``. No SIVEP,
+``NU_IDADE_N`` só tem significado junto com ``TP_IDADE`` (1 dia, 2 meses,
+3 anos), de modo que o mesmo 6 pode valer 6 dias, 6 meses ou 6 anos. A
+ingestão normaliza a conversão e ``IDADE_ANOS`` é a única coluna com
+unidade. Ver ``docs/auditoria-ml-admissao-2019-2025.md``, seção 1.
+"""
 
 DEMOGRAPHIC_FEATURES: tuple[str, ...] = (
     "CS_SEXO",
-    "NU_IDADE_N",
+    "IDADE_ANOS",
     "CS_GESTANT",
 )
 

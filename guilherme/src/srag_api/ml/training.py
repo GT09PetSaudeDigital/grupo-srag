@@ -116,7 +116,7 @@ def _train_transformed_candidate(
     )
 
 
-NUMERIC_MODEL_FEATURES = frozenset({"NU_IDADE_N", "SINT_ATE_NOTIF"})
+NUMERIC_MODEL_FEATURES = frozenset({"IDADE_ANOS", "SINT_ATE_NOTIF"})
 
 
 def split_preprocessing_features(

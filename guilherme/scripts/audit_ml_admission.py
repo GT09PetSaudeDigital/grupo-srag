@@ -22,7 +22,14 @@ from srag_api.ml.features import ADMISSION_FEATURES
 
 YEARS = tuple(range(2019, 2026))
 DATES = ("DT_SIN_PRI", "DT_NOTIFIC", "DT_INTERNA")
-EXTRA = ("ANO", "DESFECHO_NORMALIZADO", "TP_IDADE", "IDADE_ANOS", *DATES)
+EXTRA = (
+    "ANO",
+    "DESFECHO_NORMALIZADO",
+    "TP_IDADE",
+    "NU_IDADE_N",
+    "IDADE_ANOS",
+    *DATES,
+)
 MISSING = "<AUSENTE>"
 
 
