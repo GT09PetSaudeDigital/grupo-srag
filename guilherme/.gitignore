@@ -1,6 +1,9 @@
 data/raw/**/*.csv
+data/raw/**/*.json
 data/parquet/**/*.parquet
 data/quality/*.json
+
+artifacts/
 
 __pycache__/
 *.py[cod]
@@ -9,4 +12,3 @@ __pycache__/
 .venv/
 venv/
 **/.DS_Store
-artifacts/ml-admission/
