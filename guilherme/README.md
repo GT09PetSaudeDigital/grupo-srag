@@ -38,6 +38,42 @@ data/
 
 CSVs, Parquets e relatórios de qualidade gerados são ignorados pelo Git.
 
+## Baixar os bancos do portal
+
+O Ministério da Saúde publica os bancos do SIVEP-Gripe em
+[Portal de Dados Abertos da Saúde](https://dadosabertos.saude.gov.br/dataset/srag-2019-a-2026).
+Os anos anteriores ficam congelados e o ano corrente é um "banco vivo"
+atualizado semanalmente. Por isso o nome dos arquivos carrega a data de
+extração (`INFLUD25-14-09-2026.csv`) e a URL muda com frequência.
+
+O script descobre a URL atual na página do conjunto de dados. A API CKAN do
+portal não é pública e o bucket S3 não aceita listagem anônima, por isso a
+página é a fonte usada.
+
+```powershell
+# Mostrar as URLs descobertas, sem baixar
+python scripts/download_sivep.py --years 2025 --list
+
+# Baixar um ano
+python scripts/download_sivep.py --years 2025
+
+# Baixar todos os anos suportados
+python scripts/download_sivep.py --years all
+
+# O formato Parquet é muito menor que o CSV e já vem tipado
+python scripts/download_sivep.py --years all --format parquet
+
+# Se a descoberta falhar, informe o endereço
+python scripts/download_sivep.py --years 2025 --url https://...
+```
+
+Os arquivos são gravados em `data/raw/{ano}/` com o nome original do portal e
+também copiados para `INFLUD{yy}.csv`, que é o nome esperado pelo
+`scripts/ingest_all.py`. Ao lado de cada arquivo baixado é gravado um
+`{nome}.fonte.json` com a URL, a origem, o tamanho e a data do download.
+O download é escrito em um `.part` e só é renomeado ao final, para que uma
+queda de conexão não deixe um CSV truncado com aparência de completo.
+
 ## Processar um ano
 
 ```powershell
