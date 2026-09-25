@@ -1,5 +1,6 @@
 import importlib
 
+import numpy as np
 import pandas as pd
 
 
@@ -95,6 +96,40 @@ def test_build_preprocessor_accepts_categorical_only_features():
     )
 
     assert preprocessor is not None
+
+
+def test_hist_preprocessor_is_dense_and_handles_unknown_category():
+    preprocessing = _load_preprocessing_module()
+
+    assert preprocessing is not None, (
+        "srag_api.ml.preprocessing ainda nao foi implementado"
+    )
+
+    X_train = pd.DataFrame(
+        {
+            "NU_IDADE_N": [20.0, 40.0, None],
+            "CS_SEXO": ["F", "M", "F"],
+        }
+    )
+    X_validation = pd.DataFrame(
+        {
+            "NU_IDADE_N": [30.0],
+            "CS_SEXO": ["I"],
+        }
+    )
+
+    preprocessor = preprocessing.build_hist_gradient_boosting_preprocessor(
+        numeric_features=["NU_IDADE_N"],
+        categorical_features=["CS_SEXO"],
+    )
+    transformed_train = preprocessor.fit_transform(X_train)
+    transformed_validation = preprocessor.transform(X_validation)
+
+    assert isinstance(transformed_train, np.ndarray)
+    assert isinstance(transformed_validation, np.ndarray)
+    assert transformed_train.shape == (3, 2)
+    assert transformed_validation.shape == (1, 2)
+    assert transformed_validation[0, 1] == -1
 
 
 # --- Task 6: balanceamento restrito ao treino ---

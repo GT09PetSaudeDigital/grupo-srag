@@ -4,6 +4,7 @@ import subprocess
 import sys
 from pathlib import Path
 
+import joblib
 import pandas as pd
 
 from srag_api.ml import (
@@ -70,6 +71,12 @@ def test_ml_training_pipeline_runs_end_to_end_on_synthetic_data(tmp_path):
     assert paths.metrics_json.exists()
     assert paths.validation_comparison.exists()
     assert paths.run_metadata.exists()
+
+    saved_model = joblib.load(paths.best_model)
+    raw_test_features = dataset.X.iloc[split.test_idx]
+    probabilities = saved_model["pipeline"].predict_proba(raw_test_features)[:, 1]
+
+    assert len(probabilities) == len(split.test_idx)
 
 
 def test_training_cli_exposes_required_arguments():

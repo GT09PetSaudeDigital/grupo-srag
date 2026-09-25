@@ -73,6 +73,44 @@ def train_candidate_model(
         validation_metrics=validation_metrics,
     )
 
+
+def _train_transformed_candidate(
+    *,
+    name: str,
+    estimator: BaseEstimator,
+    X_train,
+    y_train: pd.Series,
+    X_validation,
+    y_validation: pd.Series,
+    fitted_preprocessor,
+) -> TrainedCandidate:
+    if isinstance(estimator, GradientBoostingClassifier):
+        sample_weight = build_gradient_boosting_sample_weight(y_train)
+        estimator.fit(X_train, y_train, sample_weight=sample_weight)
+    else:
+        estimator.fit(X_train, y_train)
+
+    probabilities = estimator.predict_proba(X_validation)[:, 1]
+    validation_metrics = evaluate_binary_predictions(
+        y_validation,
+        probabilities,
+        threshold=0.5,
+    )
+    pipeline = Pipeline(
+        [
+            ("preprocessor", fitted_preprocessor),
+            ("model", estimator),
+        ]
+    )
+
+    return TrainedCandidate(
+        name=name,
+        pipeline=pipeline,
+        validation_probabilities=np.asarray(probabilities, dtype=float),
+        validation_metrics=validation_metrics,
+    )
+
+
 NUMERIC_MODEL_FEATURES = frozenset({"NU_IDADE_N", "SINT_ATE_NOTIF"})
 
 
@@ -145,7 +183,10 @@ def run_admission_training(
     random_state: int = 42,
 ) -> TrainingRunResult:
     from .models import build_models
-    from .preprocessing import build_preprocessor
+    from .preprocessing import (
+        build_hist_gradient_boosting_preprocessor,
+        build_preprocessor,
+    )
 
     X_train = dataset.X.iloc[split.train_idx].copy()
     X_validation = dataset.X.iloc[split.validation_idx].copy()
@@ -170,30 +211,76 @@ def run_admission_training(
             "numeric_features e categorical_features devem ser informadas juntas."
         )
 
+    models = build_models(random_state=random_state)
     candidates: dict[str, TrainedCandidate] = {}
 
-    for name, estimator in build_models(random_state=random_state).items():
-        preprocessor = build_preprocessor(
-            numeric_features=numeric_features,
-            categorical_features=categorical_features,
+    print("[PREPROCESS] ajustando preprocessing compartilhado...")
+    sparse_preprocessor = build_preprocessor(
+        numeric_features=numeric_features,
+        categorical_features=categorical_features,
+    )
+    sparse_preprocessor.fit(X_train)
+    print("[PREPROCESS] transformando treino...")
+    X_train_sparse = sparse_preprocessor.transform(X_train)
+    print("[PREPROCESS] transformando validacao...")
+    X_validation_sparse = sparse_preprocessor.transform(X_validation)
+
+    for name in (
+        "logistic_regression",
+        "random_forest",
+        "gradient_boosting",
+    ):
+        print(f"[TRAIN] {name}...")
+        candidates[name] = _train_transformed_candidate(
+            name=name,
+            estimator=models[name],
+            X_train=X_train_sparse,
+            y_train=y_train,
+            X_validation=X_validation_sparse,
+            y_validation=y_validation,
+            fitted_preprocessor=sparse_preprocessor,
+        )
+        print(
+            f"[OK] {name} AUC-PR="
+            f"{candidates[name].validation_metrics.auc_pr:.4f}"
         )
 
-        candidates[name] = train_candidate_model(
-            name=name,
-            estimator=estimator,
-            X_train=X_train,
-            y_train=y_train,
-            X_validation=X_validation,
-            y_validation=y_validation,
-            preprocessor=preprocessor,
-        )
+    del X_train_sparse, X_validation_sparse
+
+    print("[PREPROCESS] preparando hist_gradient_boosting...")
+    hist_preprocessor = build_hist_gradient_boosting_preprocessor(
+        numeric_features=numeric_features,
+        categorical_features=categorical_features,
+    )
+    X_train_hist = hist_preprocessor.fit_transform(X_train)
+    X_validation_hist = hist_preprocessor.transform(X_validation)
+    hist_name = "hist_gradient_boosting"
+    print(f"[TRAIN] {hist_name}...")
+    candidates[hist_name] = _train_transformed_candidate(
+        name=hist_name,
+        estimator=models[hist_name],
+        X_train=X_train_hist,
+        y_train=y_train,
+        X_validation=X_validation_hist,
+        y_validation=y_validation,
+        fitted_preprocessor=hist_preprocessor,
+    )
+    print(
+        f"[OK] {hist_name} AUC-PR="
+        f"{candidates[hist_name].validation_metrics.auc_pr:.4f}"
+    )
 
     best = select_best_candidate(candidates)
+    print(f"[SELECT] melhor modelo: {best.name}")
 
     threshold_selection = select_decision_threshold(
         y_validation,
         best.validation_probabilities,
         min_precision=min_precision,
+    )
+    print(
+        f"[THRESHOLD] {threshold_selection.threshold:.6f} "
+        f"({threshold_selection.policy})"
     )
 
     validation_metrics = evaluate_binary_predictions(
@@ -202,12 +289,17 @@ def run_admission_training(
         threshold=threshold_selection.threshold,
     )
 
-    test_probabilities = best.pipeline.predict_proba(X_test)[:, 1]
+    print("[TEST] avaliando 2026...")
+    best_preprocessor = best.pipeline.named_steps["preprocessor"]
+    best_estimator = best.pipeline.named_steps["model"]
+    X_test_transformed = best_preprocessor.transform(X_test)
+    test_probabilities = best_estimator.predict_proba(X_test_transformed)[:, 1]
     test_metrics = evaluate_binary_predictions(
         y_test,
         test_probabilities,
         threshold=threshold_selection.threshold,
     )
+    print(f"[OK] teste final AUC-PR={test_metrics.auc_pr:.4f}")
 
     return TrainingRunResult(
         candidates=candidates,

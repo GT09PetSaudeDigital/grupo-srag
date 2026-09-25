@@ -8,7 +8,7 @@ import pandas as pd
 from sklearn.compose import ColumnTransformer
 from sklearn.impute import SimpleImputer
 from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import OneHotEncoder, StandardScaler
+from sklearn.preprocessing import OneHotEncoder, OrdinalEncoder, StandardScaler
 
 
 def build_preprocessor(
@@ -49,7 +49,49 @@ def build_preprocessor(
     return ColumnTransformer(
         transformers=transformers,
         remainder="drop",
+        sparse_threshold=1.0,
     )
+
+
+def build_hist_gradient_boosting_preprocessor(
+    numeric_features: Sequence[str],
+    categorical_features: Sequence[str],
+) -> ColumnTransformer:
+    """Monta pre-processamento denso e compacto para HistGradientBoosting."""
+    transformers = []
+
+    if numeric_features:
+        numeric_pipeline = Pipeline(
+            steps=[
+                ("imputer", SimpleImputer(strategy="median")),
+                ("scaler", StandardScaler()),
+            ]
+        )
+        transformers.append(("numeric", numeric_pipeline, list(numeric_features)))
+
+    if categorical_features:
+        categorical_pipeline = Pipeline(
+            steps=[
+                ("imputer", SimpleImputer(strategy="most_frequent")),
+                (
+                    "encoder",
+                    OrdinalEncoder(
+                        handle_unknown="use_encoded_value",
+                        unknown_value=-1,
+                    ),
+                ),
+            ]
+        )
+        transformers.append(
+            ("categorical", categorical_pipeline, list(categorical_features))
+        )
+
+    if not transformers:
+        raise ValueError(
+            "Informe ao menos uma feature numerica ou categorica para o pre-processador."
+        )
+
+    return ColumnTransformer(transformers=transformers, remainder="drop")
 
 
 def fit_preprocessor_on_train(
@@ -76,6 +118,8 @@ def transform_partitions(
         validation_transformed,
         test_transformed,
     )
+
+
 def balance_training_data(
     X_train: pd.DataFrame,
     y_train: pd.Series,

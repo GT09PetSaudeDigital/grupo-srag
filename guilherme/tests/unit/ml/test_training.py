@@ -6,7 +6,7 @@ import pytest
 from sklearn.base import BaseEstimator, ClassifierMixin
 from sklearn.compose import ColumnTransformer
 from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import OneHotEncoder, StandardScaler
 
 from srag_api.ml.features import LEAKAGE_FEATURES
 
@@ -270,6 +270,32 @@ def test_run_admission_training_uses_temporal_partitions():
         "hist_gradient_boosting",
     }
     assert result.best_model_name in result.candidates
+
+
+def test_run_admission_training_fits_shared_one_hot_preprocessor_once(monkeypatch):
+    module = _load_training_module()
+    assert module is not None
+
+    dataset, split = _build_temporal_training_fixture()
+    dataset.X["CS_SEXO"] = ["F", "M", "F", "M", "F", "M", "F", "M"]
+    fit_calls = 0
+    original_fit = OneHotEncoder.fit
+
+    def recording_fit(self, X, y=None, **fit_params):
+        nonlocal fit_calls
+        fit_calls += 1
+        return original_fit(self, X, y, **fit_params)
+
+    monkeypatch.setattr(OneHotEncoder, "fit", recording_fit)
+
+    module.run_admission_training(
+        dataset,
+        split,
+        numeric_features=["NU_IDADE_N"],
+        categorical_features=["CS_SEXO"],
+    )
+
+    assert fit_calls == 1
 
 
 def test_run_admission_training_selects_threshold_from_validation_only(monkeypatch):
