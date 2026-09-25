@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 
 import numpy as np
@@ -12,6 +13,10 @@ from .features import LEAKAGE_FEATURES
 from .metrics import BinaryMetrics, evaluate_binary_predictions
 from .models import build_gradient_boosting_sample_weight
 from .threshold import select_decision_threshold
+
+
+def _silent_progress(message: str) -> None:
+    """Descarta as mensagens de etapa quando nenhum callback e informado."""
 
 
 @dataclass(frozen=True)
@@ -151,6 +156,7 @@ def select_best_candidate(
         ),
     )
 
+
 @dataclass(frozen=True)
 class TrainingRunResult:
     candidates: dict[str, TrainedCandidate]
@@ -181,12 +187,22 @@ def run_admission_training(
     categorical_features: list[str] | None = None,
     min_precision: float = 0.50,
     random_state: int = 42,
+    progress: Callable[[str], None] | None = None,
 ) -> TrainingRunResult:
+    """Treina os candidatos, escolhe o vencedor e avalia o teste temporal.
+
+    ``progress`` recebe as mensagens de etapa. O padrão e ``None``, e nesse
+    caso nada e impresso: a camada de biblioteca nao escreve em saida. O
+    script de linha de comando injeta ``print`` para acompanhar execucoes
+    longas, que podem levar horas sobre a base nacional.
+    """
     from .models import build_models
     from .preprocessing import (
         build_hist_gradient_boosting_preprocessor,
         build_preprocessor,
     )
+
+    report = progress if progress is not None else _silent_progress
 
     X_train = dataset.X.iloc[split.train_idx].copy()
     X_validation = dataset.X.iloc[split.validation_idx].copy()
@@ -214,15 +230,15 @@ def run_admission_training(
     models = build_models(random_state=random_state)
     candidates: dict[str, TrainedCandidate] = {}
 
-    print("[PREPROCESS] ajustando preprocessing compartilhado...")
+    report("[PREPROCESS] ajustando preprocessing compartilhado...")
     sparse_preprocessor = build_preprocessor(
         numeric_features=numeric_features,
         categorical_features=categorical_features,
     )
     sparse_preprocessor.fit(X_train)
-    print("[PREPROCESS] transformando treino...")
+    report("[PREPROCESS] transformando treino...")
     X_train_sparse = sparse_preprocessor.transform(X_train)
-    print("[PREPROCESS] transformando validacao...")
+    report("[PREPROCESS] transformando validacao...")
     X_validation_sparse = sparse_preprocessor.transform(X_validation)
 
     for name in (
@@ -230,7 +246,7 @@ def run_admission_training(
         "random_forest",
         "gradient_boosting",
     ):
-        print(f"[TRAIN] {name}...")
+        report(f"[TRAIN] {name}...")
         candidates[name] = _train_transformed_candidate(
             name=name,
             estimator=models[name],
@@ -240,14 +256,14 @@ def run_admission_training(
             y_validation=y_validation,
             fitted_preprocessor=sparse_preprocessor,
         )
-        print(
+        report(
             f"[OK] {name} AUC-PR="
             f"{candidates[name].validation_metrics.auc_pr:.4f}"
         )
 
     del X_train_sparse, X_validation_sparse
 
-    print("[PREPROCESS] preparando hist_gradient_boosting...")
+    report("[PREPROCESS] preparando hist_gradient_boosting...")
     hist_preprocessor = build_hist_gradient_boosting_preprocessor(
         numeric_features=numeric_features,
         categorical_features=categorical_features,
@@ -255,7 +271,7 @@ def run_admission_training(
     X_train_hist = hist_preprocessor.fit_transform(X_train)
     X_validation_hist = hist_preprocessor.transform(X_validation)
     hist_name = "hist_gradient_boosting"
-    print(f"[TRAIN] {hist_name}...")
+    report(f"[TRAIN] {hist_name}...")
     candidates[hist_name] = _train_transformed_candidate(
         name=hist_name,
         estimator=models[hist_name],
@@ -265,20 +281,20 @@ def run_admission_training(
         y_validation=y_validation,
         fitted_preprocessor=hist_preprocessor,
     )
-    print(
+    report(
         f"[OK] {hist_name} AUC-PR="
         f"{candidates[hist_name].validation_metrics.auc_pr:.4f}"
     )
 
     best = select_best_candidate(candidates)
-    print(f"[SELECT] melhor modelo: {best.name}")
+    report(f"[SELECT] melhor modelo: {best.name}")
 
     threshold_selection = select_decision_threshold(
         y_validation,
         best.validation_probabilities,
         min_precision=min_precision,
     )
-    print(
+    report(
         f"[THRESHOLD] {threshold_selection.threshold:.6f} "
         f"({threshold_selection.policy})"
     )
@@ -289,7 +305,7 @@ def run_admission_training(
         threshold=threshold_selection.threshold,
     )
 
-    print("[TEST] avaliando 2026...")
+    report("[TEST] avaliando 2026...")
     best_preprocessor = best.pipeline.named_steps["preprocessor"]
     best_estimator = best.pipeline.named_steps["model"]
     X_test_transformed = best_preprocessor.transform(X_test)
@@ -299,7 +315,7 @@ def run_admission_training(
         test_probabilities,
         threshold=threshold_selection.threshold,
     )
-    print(f"[OK] teste final AUC-PR={test_metrics.auc_pr:.4f}")
+    report(f"[OK] teste final AUC-PR={test_metrics.auc_pr:.4f}")
 
     return TrainingRunResult(
         candidates=candidates,

@@ -84,7 +84,7 @@ def main() -> int:
         test_year=args.test_year,
     )
 
-    result = run_admission_training(dataset, split)
+    result = run_admission_training(dataset, split, progress=print)
 
     timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
     output_dir = (

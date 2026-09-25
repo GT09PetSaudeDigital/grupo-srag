@@ -399,3 +399,45 @@ def test_run_admission_training_rejects_single_class_partition():
             categorical_features=[],
         )
 
+
+def test_run_admission_training_is_silent_without_progress_callback(capsys):
+    module = _load_training_module()
+    assert module is not None
+    assert hasattr(module, "run_admission_training")
+
+    dataset, split = _build_temporal_training_fixture()
+
+    module.run_admission_training(
+        dataset,
+        split,
+        numeric_features=["NU_IDADE_N"],
+        categorical_features=[],
+    )
+
+    assert capsys.readouterr().out == ""
+
+
+def test_run_admission_training_reports_progress_to_callback():
+    module = _load_training_module()
+    assert module is not None
+    assert hasattr(module, "run_admission_training")
+
+    dataset, split = _build_temporal_training_fixture()
+    messages: list[str] = []
+
+    module.run_admission_training(
+        dataset,
+        split,
+        numeric_features=["NU_IDADE_N"],
+        categorical_features=[],
+        progress=messages.append,
+    )
+
+    assert any("PREPROCESS" in message for message in messages)
+    assert any("[TRAIN] logistic_regression" in message for message in messages)
+    assert any("[TRAIN] hist_gradient_boosting" in message for message in messages)
+    assert any("[SELECT] melhor modelo" in message for message in messages)
+    assert any("[THRESHOLD]" in message for message in messages)
+    assert any("[TEST]" in message for message in messages)
+
+
