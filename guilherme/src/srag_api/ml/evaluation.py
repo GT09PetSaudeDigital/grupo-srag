@@ -406,6 +406,7 @@ def bootstrap_confidence_interval(
 class SubgroupMetrics:
     """Metricas de uma fatia da populacao."""
 
+    column: str
     key: str
     total: int
     positives: int
@@ -475,6 +476,7 @@ def subgroup_metrics(
 
         results.append(
             SubgroupMetrics(
+                column=by,
                 key=key,
                 total=total,
                 positives=positives,
