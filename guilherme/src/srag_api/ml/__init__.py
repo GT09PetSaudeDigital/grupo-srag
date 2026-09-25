@@ -22,9 +22,39 @@ __all__ = [
     "ArtifactPaths",
     "dataset_provenance",
     "save_training_artifacts",
+    "AlertVolume",
+    "CalibrationBin",
+    "CalibrationMetrics",
+    "ConfidenceInterval",
+    "EvaluationReport",
+    "QueuePoint",
+    "SubgroupMetrics",
+    "alert_volume",
+    "brier_score",
+    "bootstrap_confidence_interval",
+    "calibration_metrics",
+    "evaluate_partition",
+    "queue_coverage",
+    "subgroup_metrics",
 ]
 
 from .artifacts import ArtifactPaths, dataset_provenance, save_training_artifacts
+from .evaluation import (
+    AlertVolume,
+    CalibrationBin,
+    CalibrationMetrics,
+    ConfidenceInterval,
+    EvaluationReport,
+    QueuePoint,
+    SubgroupMetrics,
+    alert_volume,
+    brier_score,
+    bootstrap_confidence_interval,
+    calibration_metrics,
+    evaluate_partition,
+    queue_coverage,
+    subgroup_metrics,
+)
 from .features import ADMISSION_FEATURES, LEAKAGE_FEATURES
 from .metrics import BinaryMetrics, evaluate_binary_predictions
 from .models import build_models
